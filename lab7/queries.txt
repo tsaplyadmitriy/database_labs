@@ -1,0 +1,67 @@
+
+
+/* TASK 1*/
+
+EXPLAIN ANALYZE
+SELECT title FROM film
+INNER JOIN film_category ON  film_category.film_id =film.film_id
+
+WHERE film.film_id IN(
+	SELECT film_id FROM inventory WHERE NOT(inventory_id) IN (
+		SELECT rental_id FROM rental WHERE return_date IS NULL
+	)
+
+)
+AND (rating = 'PG-13') 
+OR (rating = 'R')
+
+AND category_id IN(
+	
+	SELECT category_id 
+	FROM category 
+	WHERE category.name='Sci-Fi' OR category.name='Horror'
+ 
+);
+
+/* We perform a linear search on rental_date, sowe can create btree 
+index for null fields  to make our search of log (n) complexity*/
+
+
+CREATE INDEX nulldate_index
+	 ON public.rental  USING btree
+	 (return_date ASC NULLS LAST)
+	   WHERE return_date IS NULL;
+
+
+
+
+
+/* TASK 2 */
+
+EXPLAIN ANALYZE
+
+SELECT staff.store_id,   SUM(payment.amount) as paysum FROM payment
+JOIN staff USING (staff_id)
+
+WHERE payment.payment_date BETWEEN
+    (SELECT MAX(payment_date)  
+	 FROM payment) AND
+	 
+	(SELECT MAX(payment_date)  
+	 FROM payment) - INTERVAL '30 days' 
+    
+GROUP BY staff.store_id
+
+ORDER BY paysum DESC
+LIMIT 200
+
+
+/* We perform a linear search on payment_date, as we find max from this table twice in inner selects. 
+So, we introduce btree index to make our search of log (n) complexity*/
+
+
+CREATE INDEX paysum_index
+	ON public.payment USING btree
+	(payment_date 
+	 ASC NULLS LAST)
+	TABLESPACE pg_default;
